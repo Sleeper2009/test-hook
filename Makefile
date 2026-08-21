@@ -9,6 +9,6 @@ TWEAK_NAME = CloseGestureProbe
 
 CloseGestureProbe_FILES = Tweak.x
 CloseGestureProbe_CFLAGS = -fobjc-arc
-CloseGestureProbe_FRAMEWORKS = UIKit
+CloseGestureProbe_FRAMEWORKS = UIKit QuartzCore
 
 include $(THEOS_MAKE_PATH)/tweak.mk
