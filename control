@@ -1,0 +1,9 @@
+Package: com.fujb2009.closegestureprobe
+Name: Close Gesture Probe
+Version: 0.1.0
+Architecture: iphoneos-arm
+Description: Tweak tam thoi de log gesture dong app - chi dung debug, khong dung lau dai
+Maintainer: Furina 2009
+Author: Fujb
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000)
