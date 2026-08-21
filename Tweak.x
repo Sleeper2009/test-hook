@@ -1,12 +1,11 @@
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 
-// ===== Debug log ra file — xem bằng Filza, không cần PC =====
-// Log ghi vào /var/mobile/Documents/CloseGestureProbe.log
 static void probeLog(NSString *fmt, ...) {
     va_list args; va_start(args, fmt);
     NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:args];
     va_end(args);
-    NSString *path = @"/var/mobile/Documents/CloseGestureProbe.log";
+    NSString *path = @"/var/mobile/Documents/CloseGestureProbe2.log";
     NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [NSDate date], msg];
     NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:path];
     if (!fh) {
@@ -18,73 +17,67 @@ static void probeLog(NSString *fmt, ...) {
     [fh closeFile];
 }
 
-// forward-declare để khỏi cần header thật của SpringBoard — chỉ khai đúng những
-// gì mình cần gọi/đọc, không cần biết toàn bộ interface thật của class.
+// Chỉ log trong lúc gesture đang chạy (Began -> Ended), tránh log rác lúc bình
+// thường (SpringBoard tự set transform liên tục cho rất nhiều việc khác).
+static BOOL gProbeActive = NO;
+
 @interface SBFluidSwitcherGestureManager : NSObject
-- (id)_deckInSwitcherPanGestureRecognizer;
 @end
 
-// ===== Hook 3 hàm built-in handler tìm được qua FLEX Runtime Browser =====
 %hook SBFluidSwitcherGestureManager
-
 - (void)_handleSwitcherPanGestureBegan:(id)gesture {
     %orig;
-    UIPanGestureRecognizer *pan = gesture;
-    CGPoint t = CGPointZero;
-    CGPoint v = CGPointZero;
-    if ([pan isKindOfClass:[UIPanGestureRecognizer class]]) {
-        t = [pan translationInView:pan.view];
-        v = [pan velocityInView:pan.view];
-    }
-    probeLog(@"BEGAN  gesture=%@ class=%@ translation=%@ velocity=%@",
-             gesture, [gesture class], NSStringFromCGPoint(t), NSStringFromCGPoint(v));
+    gProbeActive = YES;
+    probeLog(@"=== GESTURE BEGAN — bat dau theo doi transform ===");
 }
-
-- (void)_handleSwitcherPanGestureChanged:(id)gesture {
-    %orig;
-    UIPanGestureRecognizer *pan = gesture;
-    CGPoint t = CGPointZero;
-    CGPoint v = CGPointZero;
-    if ([pan isKindOfClass:[UIPanGestureRecognizer class]]) {
-        t = [pan translationInView:pan.view];
-        v = [pan velocityInView:pan.view];
-    }
-    probeLog(@"CHANGED translation=%@ velocity=%@", NSStringFromCGPoint(t), NSStringFromCGPoint(v));
-}
-
 - (void)_handleSwitcherPanGestureEnded:(id)gesture {
     %orig;
-    UIPanGestureRecognizer *pan = gesture;
-    CGPoint t = CGPointZero;
-    CGPoint v = CGPointZero;
-    if ([pan isKindOfClass:[UIPanGestureRecognizer class]]) {
-        t = [pan translationInView:pan.view];
-        v = [pan velocityInView:pan.view];
-    }
-    probeLog(@"ENDED  translation=%@ velocity=%@", NSStringFromCGPoint(t), NSStringFromCGPoint(v));
+    probeLog(@"=== GESTURE ENDED — ngung theo doi transform ===");
+    gProbeActive = NO;
 }
-
-// ===== 3 hàm delegate — cùng nằm trên class này (thấy trong list method FLEX),
-// hook thêm để xác nhận thứ tự gọi thật so với 3 hàm built-in ở trên. Tham số
-// đầu là transaction (SBFluidSwitcherGestureWorkspaceTransaction*), tham số sau
-// là gesture recognizer — không cần biết type chính xác, dùng id là đủ. =====
-- (void)fluidSwitcherGestureTransaction:(id)transaction didBeginGesture:(id)gesture {
-    %orig;
-    probeLog(@"[delegate] didBeginGesture transaction=%@ gesture=%@", [transaction class], [gesture class]);
-}
-
-- (void)fluidSwitcherGestureTransaction:(id)transaction didUpdateGesture:(id)gesture {
-    %orig;
-    probeLog(@"[delegate] didUpdateGesture");
-}
-
-- (void)fluidSwitcherGestureTransaction:(id)transaction didEndGesture:(id)gesture {
-    %orig;
-    probeLog(@"[delegate] didEndGesture");
-}
-
 %end
 
+// ===== Hook setTransform: (CALayer, dùng cho cả UIView.layer lẫn CALayer con
+// riêng như SBFluidSwitcherItemContainerLayer) trên các class nghi vấn =====
+#define HOOK_LAYER_TRANSFORM(CLASS_NAME) \
+%hook CLASS_NAME \
+- (void)setTransform:(CATransform3D)t { \
+    if (gProbeActive) { \
+        probeLog(@"[%s setTransform:] tx=%.1f ty=%.1f sx=%.2f sy=%.2f", \
+                 #CLASS_NAME, t.m41, t.m42, \
+                 sqrt(t.m11*t.m11+t.m12*t.m12), sqrt(t.m21*t.m21+t.m22*t.m22)); \
+    } \
+    %orig; \
+} \
+%end
+
+HOOK_LAYER_TRANSFORM(SBFluidSwitcherItemContainerLayer)
+
+// ===== Hook setTransform: (UIView, CGAffineTransform) + setFrame: trên các
+// view class nghi vấn — dùng để bắt trường hợp hệ thống dùng affine transform
+// hoặc đổi frame trực tiếp thay vì CATransform3D =====
+#define HOOK_VIEW_TRANSFORM_FRAME(CLASS_NAME) \
+%hook CLASS_NAME \
+- (void)setTransform:(CGAffineTransform)t { \
+    if (gProbeActive) { \
+        probeLog(@"[%s setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f", \
+                 #CLASS_NAME, t.a, t.b, t.c, t.d, t.tx, t.ty); \
+    } \
+    %orig; \
+} \
+- (void)setFrame:(CGRect)f { \
+    if (gProbeActive) { \
+        probeLog(@"[%s setFrame:] %@", #CLASS_NAME, NSStringFromCGRect(f)); \
+    } \
+    %orig; \
+} \
+%end
+
+HOOK_VIEW_TRANSFORM_FRAME(SBFluidSwitcherPageView)
+HOOK_VIEW_TRANSFORM_FRAME(SBFluidSwitcherContentView)
+HOOK_VIEW_TRANSFORM_FRAME(SBAppSwitcherReusableSnapshotView)
+HOOK_VIEW_TRANSFORM_FRAME(SBDeviceApplicationSceneView)
+
 %ctor {
-    probeLog(@"=== CloseGestureProbe loaded ===");
+    probeLog(@"=== CloseGestureProbe2 loaded ===");
 }
