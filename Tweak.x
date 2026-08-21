@@ -17,8 +17,6 @@ static void probeLog(NSString *fmt, ...) {
     [fh closeFile];
 }
 
-// Chỉ log trong lúc gesture đang chạy (Began -> Ended), tránh log rác lúc bình
-// thường (SpringBoard tự set transform liên tục cho rất nhiều việc khác).
 static BOOL gProbeActive = NO;
 
 @interface SBFluidSwitcherGestureManager : NSObject
@@ -37,46 +35,80 @@ static BOOL gProbeActive = NO;
 }
 %end
 
-// ===== Hook setTransform: (CALayer, dùng cho cả UIView.layer lẫn CALayer con
-// riêng như SBFluidSwitcherItemContainerLayer) trên các class nghi vấn =====
-#define HOOK_LAYER_TRANSFORM(CLASS_NAME) \
-%hook CLASS_NAME \
-- (void)setTransform:(CATransform3D)t { \
-    if (gProbeActive) { \
-        probeLog(@"[%s setTransform:] tx=%.1f ty=%.1f sx=%.2f sy=%.2f", \
-                 #CLASS_NAME, t.m41, t.m42, \
-                 sqrt(t.m11*t.m11+t.m12*t.m12), sqrt(t.m21*t.m21+t.m22*t.m22)); \
-    } \
-    %orig; \
-} \
+%hook SBFluidSwitcherItemContainerLayer
+- (void)setTransform:(CATransform3D)t {
+    if (gProbeActive) {
+        probeLog(@"[SBFluidSwitcherItemContainerLayer setTransform:] tx=%.1f ty=%.1f sx=%.2f sy=%.2f",
+                 t.m41, t.m42,
+                 sqrt(t.m11*t.m11+t.m12*t.m12), sqrt(t.m21*t.m21+t.m22*t.m22));
+    }
+    %orig;
+}
 %end
 
-HOOK_LAYER_TRANSFORM(SBFluidSwitcherItemContainerLayer)
-
-// ===== Hook setTransform: (UIView, CGAffineTransform) + setFrame: trên các
-// view class nghi vấn — dùng để bắt trường hợp hệ thống dùng affine transform
-// hoặc đổi frame trực tiếp thay vì CATransform3D =====
-#define HOOK_VIEW_TRANSFORM_FRAME(CLASS_NAME) \
-%hook CLASS_NAME \
-- (void)setTransform:(CGAffineTransform)t { \
-    if (gProbeActive) { \
-        probeLog(@"[%s setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f", \
-                 #CLASS_NAME, t.a, t.b, t.c, t.d, t.tx, t.ty); \
-    } \
-    %orig; \
-} \
-- (void)setFrame:(CGRect)f { \
-    if (gProbeActive) { \
-        probeLog(@"[%s setFrame:] %@", #CLASS_NAME, NSStringFromCGRect(f)); \
-    } \
-    %orig; \
-} \
+%hook SBFluidSwitcherPageView
+- (void)setTransform:(CGAffineTransform)t {
+    if (gProbeActive) {
+        probeLog(@"[SBFluidSwitcherPageView setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f",
+                 t.a, t.b, t.c, t.d, t.tx, t.ty);
+    }
+    %orig;
+}
+- (void)setFrame:(CGRect)f {
+    if (gProbeActive) {
+        probeLog(@"[SBFluidSwitcherPageView setFrame:] %@", NSStringFromCGRect(f));
+    }
+    %orig;
+}
 %end
 
-HOOK_VIEW_TRANSFORM_FRAME(SBFluidSwitcherPageView)
-HOOK_VIEW_TRANSFORM_FRAME(SBFluidSwitcherContentView)
-HOOK_VIEW_TRANSFORM_FRAME(SBAppSwitcherReusableSnapshotView)
-HOOK_VIEW_TRANSFORM_FRAME(SBDeviceApplicationSceneView)
+%hook SBFluidSwitcherContentView
+- (void)setTransform:(CGAffineTransform)t {
+    if (gProbeActive) {
+        probeLog(@"[SBFluidSwitcherContentView setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f",
+                 t.a, t.b, t.c, t.d, t.tx, t.ty);
+    }
+    %orig;
+}
+- (void)setFrame:(CGRect)f {
+    if (gProbeActive) {
+        probeLog(@"[SBFluidSwitcherContentView setFrame:] %@", NSStringFromCGRect(f));
+    }
+    %orig;
+}
+%end
+
+%hook SBAppSwitcherReusableSnapshotView
+- (void)setTransform:(CGAffineTransform)t {
+    if (gProbeActive) {
+        probeLog(@"[SBAppSwitcherReusableSnapshotView setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f",
+                 t.a, t.b, t.c, t.d, t.tx, t.ty);
+    }
+    %orig;
+}
+- (void)setFrame:(CGRect)f {
+    if (gProbeActive) {
+        probeLog(@"[SBAppSwitcherReusableSnapshotView setFrame:] %@", NSStringFromCGRect(f));
+    }
+    %orig;
+}
+%end
+
+%hook SBDeviceApplicationSceneView
+- (void)setTransform:(CGAffineTransform)t {
+    if (gProbeActive) {
+        probeLog(@"[SBDeviceApplicationSceneView setTransform(affine):] a=%.2f b=%.2f c=%.2f d=%.2f tx=%.1f ty=%.1f",
+                 t.a, t.b, t.c, t.d, t.tx, t.ty);
+    }
+    %orig;
+}
+- (void)setFrame:(CGRect)f {
+    if (gProbeActive) {
+        probeLog(@"[SBDeviceApplicationSceneView setFrame:] %@", NSStringFromCGRect(f));
+    }
+    %orig;
+}
+%end
 
 %ctor {
     probeLog(@"=== CloseGestureProbe2 loaded ===");
