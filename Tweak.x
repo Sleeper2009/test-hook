@@ -6,11 +6,10 @@
 @end
 
 // ===================================================================================
-// PROBE #5 — chỉ để ĐO, trả lời 2 câu hỏi:
-//   (a) SBDeviceApplicationSceneView (view thật của app) có bị hệ thống gỡ khỏi window
-//       trong lúc kéo tay vuốt-lên-đóng-app không, hay vẫn còn sống?
-//   (b) Sau khi buông tay xác nhận đóng, hệ thống còn animate transform NGẦM (không
-//       qua -setTransform: tường minh) hay dừng hẳn tại điểm buông tay?
+// PROBE #6 — nối tiếp probe #5. Thêm câu hỏi cuối cùng:
+//   (c) Trong lúc đang kéo tay (BEGAN -> ENDED), view thật (SBDeviceApplicationSceneView)
+//       có đang HIỂN THỊ (alpha/hidden/opacity) song song với lớp snapshot không, hay đã
+//       bị ẩn đi để nhường chỗ cho snapshot?
 // ===================================================================================
 
 #define LM_DEBUG 1
@@ -44,7 +43,7 @@ static void ProbePollPresentationLayers(NSInteger tick) {
         gProbeTrackedLayers = [NSMutableArray array];
     }
     if (tick >= 90) { // ~90 * 16ms ≈ 1.5s sau khi buông tay
-        lmLog(@"[probe5] POLL kết thúc sau ~1.5s, dừng theo dõi.");
+        lmLog(@"[probe6] POLL kết thúc sau ~1.5s, dừng theo dõi.");
         gProbeTrackedLayers = nil;
         return;
     }
@@ -52,12 +51,25 @@ static void ProbePollPresentationLayers(NSInteger tick) {
         CALayer *pres = layer.presentationLayer;
         if (!pres) continue;
         CATransform3D t = pres.transform;
-        lmLog(@"[probe5] POLL#%ld layer=%p tick=%.0fms tx=%.2f ty=%.2f sx=%.3f sy=%.3f m34=%.5f",
+        lmLog(@"[probe6] POLL#%ld layer=%p tick=%.0fms tx=%.2f ty=%.2f sx=%.3f sy=%.3f m34=%.5f",
               (long)tick, layer, tick*16.0, t.m41, t.m42, t.m11, t.m22, t.m34);
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.016 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         ProbePollPresentationLayers(tick + 1);
     });
+}
+
+// ----- Log trạng thái hiển thị (alpha/hidden/opacity) của view thật -----
+static void ProbeLogActiveViewVisibility(NSString *tag) {
+    SBDeviceApplicationSceneView *v = gProbeActiveSceneView;
+    if (!v) {
+        lmLog(@"[probe6] %@ activeSceneView=nil (không có view để log)", tag);
+        return;
+    }
+    CALayer *pres = v.layer.presentationLayer;
+    lmLog(@"[probe6] %@ activeSceneView=%p alpha=%.3f hidden=%d layer.opacity=%.3f presentation.opacity=%.3f window=%p frame=%@",
+          tag, v, v.alpha, v.hidden, v.layer.opacity,
+          pres ? pres.opacity : -1.0f, v.window, NSStringFromCGRect(v.frame));
 }
 
 %hook CALayer
@@ -69,7 +81,7 @@ static void ProbePollPresentationLayers(NSInteger tick) {
             [gProbeTrackedLayers addObject:self];
         }
         CGRect f = self.frame;
-        lmLog(@"[probe5] setTransform layer=%p frame=%@ (đang co dần về icon nếu w/h -> ~60)",
+        lmLog(@"[probe6] snapshot setTransform layer=%p frame=%@ (đang co dần về icon nếu w/h -> ~60)",
               self, NSStringFromCGRect(f));
     }
 }
@@ -81,45 +93,69 @@ static void ProbePollPresentationLayers(NSInteger tick) {
     %orig;
     if (self.window) {
         gProbeActiveSceneView = self;
-        lmLog(@"[probe5] scene view %p GẮN vào window (bounds=%@)", self, NSStringFromCGRect(self.bounds));
+        lmLog(@"[probe6] scene view %p GẮN vào window (bounds=%@) alpha=%.3f hidden=%d",
+              self, NSStringFromCGRect(self.bounds), self.alpha, self.hidden);
     } else {
         CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
         CFAbsoluteTime deltaFromBegan = gProbeGestureBeganAt > 0 ? (now - gProbeGestureBeganAt) : -1;
-        lmLog(@"[probe5] scene view %p BỊ GỠ khỏi window. deltaFromGestureBegan=%.3fs (âm nghĩa là gesture chưa bắt đầu)",
+        lmLog(@"[probe6] scene view %p BỊ GỠ khỏi window. deltaFromGestureBegan=%.3fs (âm nghĩa là gesture chưa bắt đầu)",
               self, deltaFromBegan);
+    }
+}
+
+// Bắt luôn nếu có ai đó chỉnh alpha/hidden trực tiếp trên view thật trong lúc gesture chạy —
+// đây chính là bằng chứng rõ nhất cho câu hỏi (c).
+- (void)setAlpha:(CGFloat)a {
+    %orig;
+    if (self == gProbeActiveSceneView) {
+        lmLog(@"[probe6] activeSceneView setAlpha:%.3f", a);
+    }
+}
+
+- (void)setHidden:(BOOL)h {
+    %orig;
+    if (self == gProbeActiveSceneView) {
+        lmLog(@"[probe6] activeSceneView setHidden:%d", h);
     }
 }
 %end
 
 // ----- Hook vào đúng các callback grabberTongue bạn đã dò ra trước đó -----
-// LƯU Ý: nếu tên method/class trong bản probe cũ của bạn (đã ra log CloseGestureProbe*.log,
-// LiquidMorph.log, ClosingProbe3.log) khác chữ ký dưới đây, hãy sửa lại cho khớp — quan
-// trọng nhất là giữ đúng các dòng lmLog(...) bên trong.
+// LƯU Ý: nếu tên method/class trong bản probe cũ của bạn khác chữ ký dưới đây,
+// sửa lại cho khớp — quan trọng nhất là giữ đúng các dòng lmLog(...) bên trong.
 %hook SBFluidSwitcherGestureManager
 - (void)grabberTongueBeganPulling:(id)tongue withDistance:(CGFloat)distance andVelocity:(CGFloat)velocity andGesture:(id)gesture {
     gProbeGestureBeganAt = CFAbsoluteTimeGetCurrent();
-    lmLog(@"[probe5] BEGAN. activeSceneView=%p window=%p (nil nghĩa là ĐÃ bị gỡ TRƯỚC khi gesture bắt đầu)",
-          gProbeActiveSceneView, gProbeActiveSceneView.window);
+    lmLog(@"[probe6] BEGAN. activeSceneView=%p window=%p", gProbeActiveSceneView, gProbeActiveSceneView.window);
+    ProbeLogActiveViewVisibility(@"BEGAN");
+    %orig;
+}
+
+- (void)grabberTongueUpdatedPulling:(id)tongue withDistance:(CGFloat)distance andVelocity:(CGFloat)velocity andGesture:(id)gesture {
+    // Chỉ log alpha/hidden ở đây, KHÔNG log transform (đã có ở %hook CALayer rồi, tránh log trùng/lụt).
+    ProbeLogActiveViewVisibility([NSString stringWithFormat:@"UPDATED distance=%.2f velocity=%.2f", distance, velocity]);
     %orig;
 }
 
 - (void)grabberTongueEndedPulling:(id)tongue withDistance:(CGFloat)distance andVelocity:(CGFloat)velocity andGesture:(id)gesture {
-    lmLog(@"[probe5] ENDED (trước %%orig). activeSceneView window=%p", gProbeActiveSceneView.window);
+    lmLog(@"[probe6] ENDED (trước %%orig). activeSceneView window=%p", gProbeActiveSceneView.window);
+    ProbeLogActiveViewVisibility(@"ENDED (trước %orig)");
     %orig;
-    lmLog(@"[probe5] ENDED (sau %%orig). activeSceneView window=%p -> bắt đầu poll 1.5s xem còn animate ngầm không",
-          gProbeActiveSceneView.window);
+    lmLog(@"[probe6] ENDED (sau %%orig). activeSceneView window=%p -> bắt đầu poll 1.5s", gProbeActiveSceneView.window);
+    ProbeLogActiveViewVisibility(@"ENDED (sau %orig)");
     ProbePollPresentationLayers(0);
 }
 
 - (void)grabberTongueCanceledPulling:(id)tongue withDistance:(CGFloat)distance andVelocity:(CGFloat)velocity andGesture:(id)gesture {
-    lmLog(@"[probe5] CANCELED (trước %%orig). activeSceneView window=%p", gProbeActiveSceneView.window);
+    lmLog(@"[probe6] CANCELED (trước %%orig). activeSceneView window=%p", gProbeActiveSceneView.window);
+    ProbeLogActiveViewVisibility(@"CANCELED (trước %orig)");
     %orig;
-    lmLog(@"[probe5] CANCELED (sau %%orig). activeSceneView window=%p -> bắt đầu poll 1.5s",
-          gProbeActiveSceneView.window);
+    lmLog(@"[probe6] CANCELED (sau %%orig). activeSceneView window=%p -> bắt đầu poll 1.5s", gProbeActiveSceneView.window);
+    ProbeLogActiveViewVisibility(@"CANCELED (sau %orig)");
     ProbePollPresentationLayers(0);
 }
 %end
 
 %ctor {
-    lmLog(@"[probe5] tweak nạp xong, bắt đầu theo dõi.");
+    lmLog(@"[probe6] tweak nạp xong, bắt đầu theo dõi.");
 }
