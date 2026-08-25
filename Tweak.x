@@ -50,27 +50,30 @@ static void reloadPrefsCallback(CFNotificationCenterRef center, void *observer,
                 oldPos.x + (newAnchor.x - oldAnchor.x) * bounds.size.width,
                 oldPos.y + (newAnchor.y - oldAnchor.y) * bounds.size.height
             );
+
+            // QUAN TRỌNG: tắt animation ngầm để trạng thái "nhỏ sẵn"
+            // được áp dụng NGAY LẬP TỨC, không có 1 frame nào hiện to trước
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
             layer.anchorPoint = newAnchor;
             layer.position = newPos;
-
             [layer removeAllAnimations];
-
-            // Gần như hiện rõ ngay, chỉ mờ nhẹ lúc bắt đầu (không fade từ 0)
             targetView.alpha = 0.85;
             targetView.transform = CGAffineTransformMakeScale(0.3, 0.3);
+            [CATransaction commit];
 
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [UIView animateWithDuration:0.35
-                                      delay:0.0
-                     usingSpringWithDamping:0.75
-                      initialSpringVelocity:0.4
-                                    options:UIViewAnimationOptionCurveEaseOut
-                                 animations:^{
-                    targetView.alpha = 1.0;
-                    targetView.transform = CGAffineTransformIdentity;
-                }
-                                 completion:nil];
-            });
+            // Chạy animation phóng to NGAY trong cùng lượt runloop
+            // (không dùng dispatch_async để tránh flash 1 frame to trước)
+            [UIView animateWithDuration:0.35
+                                  delay:0.0
+                 usingSpringWithDamping:0.75
+                  initialSpringVelocity:0.4
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                targetView.alpha = 1.0;
+                targetView.transform = CGAffineTransformIdentity;
+            }
+                             completion:nil];
         }
     }
 }
