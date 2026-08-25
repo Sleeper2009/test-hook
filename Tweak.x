@@ -1,3 +1,4 @@
+// Tweak.x
 #import <UIKit/UIKit.h>
 
 @interface NCNotificationShortLookViewController : UIViewController
@@ -36,17 +37,34 @@ static void reloadPrefsCallback(CFNotificationCenterRef center, void *observer,
         if ([[className lowercaseString] containsString:@"banner"]) {
 
             UIView *targetView = [self view];
+            CALayer *layer = targetView.layer;
 
-            [targetView.layer removeAllAnimations];
-            targetView.alpha = 0.0;
-            targetView.transform = CGAffineTransformMakeScale(0.85, 0.85);
+            // Đổi anchorPoint sang giữa mép trên để banner "phồng ra"
+            // từ 1 điểm trên đỉnh thay vì từ tâm view
+            CGPoint oldAnchor = layer.anchorPoint;
+            CGRect bounds = targetView.bounds;
+            CGPoint newAnchor = CGPointMake(0.5, 0.0);
+
+            CGPoint oldPos = layer.position;
+            CGPoint newPos = CGPointMake(
+                oldPos.x + (newAnchor.x - oldAnchor.x) * bounds.size.width,
+                oldPos.y + (newAnchor.y - oldAnchor.y) * bounds.size.height
+            );
+            layer.anchorPoint = newAnchor;
+            layer.position = newPos;
+
+            [layer removeAllAnimations];
+
+            // Gần như hiện rõ ngay, chỉ mờ nhẹ lúc bắt đầu (không fade từ 0)
+            targetView.alpha = 0.85;
+            targetView.transform = CGAffineTransformMakeScale(0.3, 0.3);
 
             dispatch_async(dispatch_get_main_queue(), ^{
-                [UIView animateWithDuration:0.05
+                [UIView animateWithDuration:0.35
                                       delay:0.0
-                     usingSpringWithDamping:0.8
-                      initialSpringVelocity:0.5
-                                    options:0
+                     usingSpringWithDamping:0.75
+                      initialSpringVelocity:0.4
+                                    options:UIViewAnimationOptionCurveEaseOut
                                  animations:^{
                     targetView.alpha = 1.0;
                     targetView.transform = CGAffineTransformIdentity;
