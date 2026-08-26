@@ -1,14 +1,10 @@
-THEOS_PACKAGE_SCHEME = rootless
-
-TARGET := iphone:clang:latest:15.0
-ARCHS := arm64 arm64e
-
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = CloseGestureProbe
-
-CloseGestureProbe_FILES = Tweak.x
-CloseGestureProbe_CFLAGS = -fobjc-arc
-CloseGestureProbe_FRAMEWORKS = UIKit QuartzCore
+TWEAK_NAME = Notification26
+Notification26_FILES = Tweak.x
+Notification26_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+
+SUBPROJECTS += notification26prefs
+include $(THEOS_MAKE_PATH)/aggregate.mk
