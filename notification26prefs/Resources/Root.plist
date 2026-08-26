@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>title</key>
+    <string>Notification26</string>
+    <key>specifiers</key>
+    <array>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>footerText</key>
+            <string>Hiệu ứng thông báo phồng ra từ đỉnh màn hình</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>label</key>
+            <string>Bật hiệu ứng</string>
+            <key>key</key>
+            <string>kEnabled</string>
+            <key>default</key>
+            <true/>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>Animation</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Thời gian (giây)</string>
+            <key>key</key>
+            <string>kAnimDuration</string>
+            <key>default</key>
+            <real>0.35</real>
+            <key>min</key>
+            <real>0.1</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Độ cứng lò xo (damping)</string>
+            <key>key</key>
+            <string>kSpringDamping</string>
+            <key>default</key>
+            <real>0.75</real>
+            <key>min</key>
+            <real>0.1</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Tốc độ ban đầu (velocity)</string>
+            <key>key</key>
+            <string>kSpringVelocity</string>
+            <key>default</key>
+            <real>0.4</real>
+            <key>min</key>
+            <real>0.0</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>Kích thước / độ mờ ban đầu</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Scale ngang ban đầu</string>
+            <key>key</key>
+            <string>kInitialScaleX</string>
+            <key>default</key>
+            <real>0.3</real>
+            <key>min</key>
+            <real>0.05</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Scale dọc ban đầu</string>
+            <key>key</key>
+            <string>kInitialScaleY</string>
+            <key>default</key>
+            <real>0.3</real>
+            <key>min</key>
+            <real>0.05</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Độ mờ ban đầu</string>
+            <key>key</key>
+            <string>kInitialAlpha</string>
+            <key>default</key>
+            <real>0.85</real>
+            <key>min</key>
+            <real>0.0</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSliderCell</string>
+            <key>label</key>
+            <string>Điểm neo dọc (0=trên, 1=dưới)</string>
+            <key>key</key>
+            <string>kAnchorPointY</string>
+            <key>default</key>
+            <real>0.0</real>
+            <key>min</key>
+            <real>0.0</real>
+            <key>max</key>
+            <real>1.0</real>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>Lọc loại thông báo</string>
+            <key>footerText</key>
+            <string>Chỉ áp hiệu ứng cho view có tên class chứa từ khóa này</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSEditTextCell</string>
+            <key>label</key>
+            <string>Từ khóa lọc</string>
+            <key>key</key>
+            <string>kFilterKeyword</string>
+            <key>default</key>
+            <string>banner</string>
+            <key>defaults</key>
+            <string>com.phuc.notification26</string>
+            <key>PostNotification</key>
+            <string>com.phuc.notification26/reload</string>
+        </dict>
+
+    </array>
+</dict>
+</plist>
