@@ -1,116 +1,68 @@
-// Tweak.x
-#import <UIKit/UIKit.h>
+// RecordUnhide - chạy trong SpringBoard.
+// Mục đích: gỡ cờ "secure" khỏi các layer/context của SpringBoard (gồm bàn phím
+// nhập mật mã) để quay màn hình hiện ra bàn phím số thay vì bị che.
+//
+// Chưa được biên dịch hay thử trên máy thật. Các tên hàm private và giá trị
+// mask 0x12 dưới đây là theo hiểu biết của mình về iOS, hãy kiểm tra bằng log.
 
-@interface NCNotificationShortLookViewController : UIViewController
-- (id)delegate;
+#import <Foundation/Foundation.h>
+#import <QuartzCore/QuartzCore.h>
+#import <objc/runtime.h>
+
+@interface CAContext : NSObject
+- (void)setSecure:(BOOL)secure;
 @end
 
-// ===== CÁC GIÁ TRỊ MẶC ĐỊNH (dùng khi chưa có plist hoặc thiếu key) =====
-static BOOL   kEnabled          = YES;   // Bật/tắt tweak
-static double kAnimDuration     = 0.35;  // Thời gian animation (giây). Càng nhỏ càng nhanh/giật, càng lớn càng chậm/mượt
-static double kSpringDamping    = 0.75;  // Độ "cứng" lò xo (0.0 - 1.0). Thấp = nảy nhiều lần, cao = không nảy (mượt thẳng)
-static double kSpringVelocity   = 0.4;   // Tốc độ ban đầu lúc bắt đầu animate. Cao = vọt nhanh lúc đầu rồi mới chậm lại
-static double kInitialScaleX    = 0.3;   // Tỉ lệ scale ban đầu theo chiều ngang (0.0 - 1.0). Càng nhỏ, banner "nở ra" từ chấm càng nhỏ càng rõ
-static double kInitialScaleY    = 0.3;   // Tỉ lệ scale ban đầu theo chiều dọc
-static double kInitialAlpha     = 0.85;  // Độ mờ lúc bắt đầu (0.0 = trong suốt hẳn, 1.0 = hiện rõ luôn, không fade)
-static double kAnchorPointY     = 0.0;   // Điểm neo theo chiều dọc (0.0 = mép trên, 0.5 = giữa view, 1.0 = mép dưới)
-                                          // 0.0 sẽ làm banner "phồng ra" từ đỉnh, giống hiệu ứng bạn mô tả
-static NSString *kFilterKeyword = @"banner"; // Từ khóa lọc tên class delegate, chỉ áp animation nếu tên class chứa từ này (không phân biệt hoa thường)
+#define RU_DOMAIN CFSTR("com.recordunhide")
+#define RULog(fmt, ...) NSLog(@"[RecordUnhide] " fmt, ##__VA_ARGS__)
 
-static void loadPrefs() {
-    NSDictionary *prefs = [[NSDictionary alloc]
-        initWithContentsOfFile:@"/var/mobile/Library/Preferences/com.phuc.notification26.plist"];
-    if (!prefs) return;
+// Các bit thường gặp ở disableUpdateMask của layer "secure" (như ô mật khẩu).
+static const unsigned int kSecureBits = 0x12;
 
-    id v;
-    if ((v = prefs[@"kEnabled"]))        kEnabled        = [v boolValue];
-    if ((v = prefs[@"kAnimDuration"]))   kAnimDuration   = [v doubleValue];
-    if ((v = prefs[@"kSpringDamping"]))  kSpringDamping  = [v doubleValue];
-    if ((v = prefs[@"kSpringVelocity"])) kSpringVelocity = [v doubleValue];
-    if ((v = prefs[@"kInitialScaleX"]))  kInitialScaleX  = [v doubleValue];
-    if ((v = prefs[@"kInitialScaleY"]))  kInitialScaleY  = [v doubleValue];
-    if ((v = prefs[@"kInitialAlpha"]))   kInitialAlpha   = [v doubleValue];
-    if ((v = prefs[@"kAnchorPointY"]))   kAnchorPointY   = [v doubleValue];
-    if ((v = prefs[@"kFilterKeyword"])) {
-        if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
-            kFilterKeyword = v;
-        }
+// Bật mặc định. Tắt bằng: defaults write com.recordunhide enabled -bool false
+static BOOL RUEnabled(void) {
+    Boolean exists = false;
+    Boolean value = CFPreferencesGetAppBooleanValue(CFSTR("enabled"), RU_DOMAIN, &exists);
+    return exists ? (value != 0) : YES;
+}
+
+%group LayerMask
+%hook CALayer
+- (void)setDisableUpdateMask:(unsigned int)mask {
+    if ((mask & kSecureBits) && RUEnabled()) {
+        RULog(@"layer %@ mask 0x%x -> 0x%x", NSStringFromClass([self class]), mask, mask & ~kSecureBits);
+        mask &= ~kSecureBits;
     }
+    %orig(mask);
 }
+%end
+%end
 
-static void reloadPrefsCallback(CFNotificationCenterRef center, void *observer,
-                                 CFStringRef name, const void *object,
-                                 CFDictionaryRef userInfo) {
-    loadPrefs();
-}
-
-%hook NCNotificationShortLookViewController
-
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-
-    if (!kEnabled) return;
-
-    id delegateObj = [self delegate];
-    if ([delegateObj respondsToSelector:@selector(class)]) {
-        NSString *className = NSStringFromClass([delegateObj class]);
-        if ([[className lowercaseString] containsString:[kFilterKeyword lowercaseString]]) {
-
-            UIView *targetView = [self view];
-            CALayer *layer = targetView.layer;
-
-            // Đổi anchorPoint theo kAnchorPointY để đổi hướng "phồng ra"
-            CGPoint oldAnchor = layer.anchorPoint;
-            CGRect bounds = targetView.bounds;
-            CGPoint newAnchor = CGPointMake(0.5, kAnchorPointY);
-
-            CGPoint oldPos = layer.position;
-            CGPoint newPos = CGPointMake(
-                oldPos.x + (newAnchor.x - oldAnchor.x) * bounds.size.width,
-                oldPos.y + (newAnchor.y - oldAnchor.y) * bounds.size.height
-            );
-
-            // Tắt animation ngầm để trạng thái "nhỏ sẵn" áp dụng NGAY LẬP TỨC,
-            // không có frame nào hiện to trước khi animation chạy
-            [CATransaction begin];
-            [CATransaction setDisableActions:YES];
-            layer.anchorPoint = newAnchor;
-            layer.position = newPos;
-            [layer removeAllAnimations];
-            targetView.alpha = kInitialAlpha;
-            targetView.transform = CGAffineTransformMakeScale(kInitialScaleX, kInitialScaleY);
-            [CATransaction commit];
-
-            // Chạy animation phóng to ngay trong cùng lượt runloop (không dispatch_async)
-            [UIView animateWithDuration:kAnimDuration
-                                  delay:0.0
-                 usingSpringWithDamping:kSpringDamping
-                  initialSpringVelocity:kSpringVelocity
-                                options:UIViewAnimationOptionCurveEaseOut
-                             animations:^{
-                targetView.alpha = 1.0;
-                targetView.transform = CGAffineTransformIdentity;
-            }
-                             completion:nil];
-        }
+%group SecureContext
+%hook CAContext
+- (void)setSecure:(BOOL)secure {
+    if (secure && RUEnabled()) {
+        RULog(@"CAContext setSecure:YES -> NO");
+        secure = NO;
     }
+    %orig(secure);
 }
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    if (!kEnabled) return;
-}
-
+%end
 %end
 
 %ctor {
-    loadPrefs();
-    CFNotificationCenterAddObserver(
-        CFNotificationCenterGetDarwinNotifyCenter(),
-        NULL,
-        (CFNotificationCallback)reloadPrefsCallback,
-        CFSTR("com.phuc.notification26/reload"),
-        NULL,
-        CFNotificationSuspensionBehaviorCoalesce
-    );
+    // Chỉ chạy trong SpringBoard (plist filter đã giới hạn, đây là lớp bảo hiểm).
+    if (![[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"com.apple.springboard"]) return;
+
+    // Chỉ hook khi selector thật sự tồn tại trên bản iOS này.
+    if (class_getInstanceMethod(objc_getClass("CALayer"), NSSelectorFromString(@"setDisableUpdateMask:"))) {
+        %init(LayerMask);
+    } else {
+        RULog(@"CALayer setDisableUpdateMask: not found");
+    }
+    if (class_getInstanceMethod(objc_getClass("CAContext"), NSSelectorFromString(@"setSecure:"))) {
+        %init(SecureContext);
+    } else {
+        RULog(@"CAContext setSecure: not found");
+    }
 }
