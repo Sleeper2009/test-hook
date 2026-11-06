@@ -1,0 +1,26 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Theos
+        uses: Randomblock1/theos-action@v1
+
+      - name: Build
+        # Máy rootless (có /var/jb): bỏ dấu # ở hai dòng env dưới.
+        # env:
+        #   THEOS_PACKAGE_SCHEME: rootless
+        run: make package
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: RecordUnhide-deb
+          path: packages/*.deb
