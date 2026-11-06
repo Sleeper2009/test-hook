@@ -1,9 +1,9 @@
-Package: com.fujb.2009
-Name: Notification26
-Depends: mobilesubstrate, preferenceloader
-Description: Test animation thông báo
-Maintainer: Phúc sieu cap cu to
-Author: fujb2009
+Package: com.recordunhide.tweak
+Name: RecordUnhide
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: Go co secure tren SpringBoard de quay man hinh thay duoc ban phim nhap mat ma
+Maintainer: you
+Author: you
 Section: Tweaks
-Architecture: iphoneos-arm64
-Version: 1.1.0-1
+Depends: mobilesubstrate (>= 0.9.5000)
